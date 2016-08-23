@@ -6,7 +6,7 @@ if CLIENT then
 	SWEP.ViewModelFlip = true
 	SWEP.ViewModelFOV = 60
 end
-SWEP.Base = "weapon_zs_base"
+SWEP.Base = "weapon_base"
 SWEP.HoldType = "pistol"
 SWEP.ViewModel = "models/weapons/v_pistol.mdl"
 SWEP.WorldModel = "models/weapons/w_pistol.mdl"
