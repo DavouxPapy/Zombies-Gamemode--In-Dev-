@@ -1,0 +1,2 @@
+--Map directory for the gamemode:
+-- http://steamcommunity.com/sharedfiles/filedetails/?id=746929992&requirelogin=true

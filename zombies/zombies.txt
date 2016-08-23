@@ -1,0 +1,9 @@
+"Gamemode"
+{
+	"base" "base"
+	"title" "Zombies"
+	"maps" "^gm_"
+	"menusystem" "1"
+	
+	"Settings"
+}

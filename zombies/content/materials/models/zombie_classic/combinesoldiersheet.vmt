@@ -1,0 +1,13 @@
+"VertexLitGeneric"
+{
+	"$baseTexture" 	"models/zombie_classic/combinesoldiersheet_zombie"
+	"$envmap" "env_cubemap"	
+	"$envmapmask" "models/zombie_classic/combinesoldiersheet_mask"
+	"$envmapcontrast" 1
+	"$surfaceprop" "flesh"
+	"$selfillum" 1
+	"$model" 1
+}
+
+
+
