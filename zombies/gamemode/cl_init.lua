@@ -9,7 +9,7 @@ net.Receive("top", function()
 end)
 scoreboard = scoreboard or {}
 function scoreboard:show()
-	return nil
+	return false
 end
 function scoreboard:hide()
 	return
@@ -37,7 +37,7 @@ hook.Add("HUDShouldDraw", "hideHud", hideHud)
 local shouldDraw = true
 local function createZFont()
 	surface.CreateFont("ZombiesFont", {
-		font = "CloseCaption_Bold",
+		font = "hidden",
 		extended = false,
 		size = 20,
 		weight = 500,
@@ -64,7 +64,11 @@ function GM:HUDPaint()
 	surface.SetTextColor(255,0,0)
 	surface.SetTextPos(ScrW() - 800, ScrH() - 98)
 	surface.SetFont("ZombiesFont")
-	surface.DrawText("CURRENT HEALTH: " .. hp)
+	if hp <= 0 then
+		surface.DrawText("YOU HAVE DIED!")
+	else
+		surface.DrawText("CURRENT HEALTH: " .. hp)
+	end
 	surface.SetTextColor(255,0,0)
 	surface.SetTextPos(ScrW() - 920, ScrH() - 98)
 	surface.SetFont("ZombiesFont")
@@ -74,23 +78,25 @@ function GM:HUDPaint()
 	surface.SetTextColor(255,0,0)
 	surface.SetTextPos(ScrW() - 1100, ScrH() - 98)
 	surface.SetFont("ZombiesFont")
-	surface.DrawText("CURRENT ROUND: " .. ply:GetNWInt("wave"))
+	surface.DrawText("ROUND: " .. ply:GetNWInt("wave"))
 	if IsValid(ply) and ply:Alive() then
 		if #ply:GetWeapons() <= 0 then
 			return false
-		else
-			local weaponAmmo = ply:GetActiveWeapon():Clip1()
-			local weaponMaxAmmo = ply:GetActiveWeapon():GetMaxClip1()
+		elseif ply:GetActiveWeapon() ~= nil then
 			local ammoType = ply:GetActiveWeapon():GetPrimaryAmmoType()
 			local reserve = ply:GetAmmoCount(ammoType)
-			if weaponAmmo == nil or weaponMaxAmmo == nil or ammoType == nil or reserve <= 0 then
-				return false
-			else
-				surface.SetTextColor(255,0,0)
-				surface.SetTextPos(ScrW() - 600, ScrH() - 98)
-				surface.SetFont("ZombiesFont")
-				surface.DrawText("AMMO COUNT: " .. weaponAmmo .. " | " .. weaponMaxAmmo .. " / " .. reserve)
-			end
+			surface.SetTextColor(255,0,0)
+			surface.SetTextPos(ScrW() - 500, ScrH() - 98)
+			surface.SetFont("ZombiesFont")
+			surface.DrawText("AMMO TOTAL: " .. reserve)
+		else
+			return false
 		end
+	else
+		return false
 	end
 end
+net.Receive("loop1", function()
+	net.Send("beginGame")
+	net.SendToServer()
+end)
