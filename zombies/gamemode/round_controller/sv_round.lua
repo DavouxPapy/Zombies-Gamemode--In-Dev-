@@ -1,4 +1,7 @@
 util.AddNetworkString("updateRound")
+util.AddNetworkString("giveWeapon")
+util.AddNetworkString("beginGame")
+util.AddNetworkString("loop1")
 local meta = FindMetaTable("Player")
 function meta:MaxAmmo()
 	for _, weap in pairs(self:GetWeapons()) do
@@ -9,61 +12,102 @@ function meta:MaxAmmo()
 	end
 end
 roundStatus = 0 -- 0 is off, 1 is on for normal zombies, 2 is for boss zombies.
-activeRound = 1
+activeRound = 0
 local t = 0
-local interval = 3
+local interval = 4
 local zombieCount = 6
 local isSpawning = false
-local positions = {
-	Vector(648.569580, -246.743088, -12287.975586),
-	Vector(2.734118, 152.259125, -12287.975586),
-	Vector(-517.236023, -521.195251, -12287.975586),
-	Vector(-494.958130, 43.163109, -12287.975586),
-	Vector(-32.042698, 748.289673, -12287.975586),
-	Vector(793.767700, -365.695862, -12287.976563)
-}
-util.AddNetworkString("UpdateRoundStatus")
-util.AddNetworkString("kills")
+local positions = {}
+local zombie = "npc_zombie"
+local hp = 25
+local amountReady = 0
+local shouldStart = nil
+local multiplier = 1.00
+local amountKilled = 0
+local currentRound = 1
+local wait = false
+function AddZombieSpawn(map, position)
+	timer.Simple(1, function()
+		if game.GetMap() == map then
+			table.insert(positions, position)
+		end
+	end)
+end
+function AddHumanSpawn(map, position, ang)
+	timer.Simple(1, function()
+		if game.GetMap() == map then
+			local ent = ents.Create("spawn_human")
+			if not IsValid(ent) then
+				return
+			end
+			ent:SetPos(position)
+			ent:SetAngles(ang)
+			ent:Spawn()
+			ent:DropToFloor()
+		end
+	end)
+end
+hook.Add("InitPostEntity", "hooman", AddHumanSpawn)
+hook.Add("InitPostEntity", "zambie", AddZombieSpawn)
+-----------------------------------------------------
+--Add spawnpoints for gm_construct, the default map--
+AddHumanSpawn("gm_construct", Vector(491, -402, 83), Angle(0, 30, 0));
+-----------------------------------------------------
+AddZombieSpawn("gm_construct", Vector(820, -109, 79));
+AddZombieSpawn("gm_construct", Vector(781, 337, -79));
+AddZombieSpawn("gm_construct", Vector(843, -458, 79));
+AddZombieSpawn("gm_construct", Vector(790, 62, -79));
+AddZombieSpawn("gm_construct", Vector(830, -319, -79));
+AddZombieSpawn("gm_construct", Vector(500, -402, 83));
+AddZombieSpawn("gm_construct", Vector(550, -402, 83));
+AddZombieSpawn("gm_construct", Vector(825, -688, 79));
+AddZombieSpawn("gm_construct", Vector(832, -220, -79));
+-----------------------------------------------------
+----------------------------------------------------
+-- Add any custom spawnpoints for other maps here.--
+----------------------------------------------------
+net.Receive("readyUp", function(len, ply)
+	local readied = ply:GetNWBool("ready")
+	if readied == true then
+		amountReady = amountReady + 1
+	end
+end)
+if amountReady >= #player.GetAll() then
+	shouldStart = true
+end
 function beginRound()
-	roundStatus = 1
-	clUp()
-	isSpawning = true
-	net.Start("updateRound")
-	net.Broadcast()
-end
-function stuffs()
-	activeRound = 1
-	roundStatus = 1
-	zombieCount = 6
-	hp = 50
-	zombie = "npc_zombie"
-	for _, ply in pairs(player.GetAll()) do
-		ply:SetNWInt("killcounter",0)
+	if shouldStart then
+		roundStatus = 1
+		for _, ply in pairs(player.GetAll()) do
+			ply:SetTeam(1)
+			ply:SetNWInt("wave", activeRound)
+		end
+		net.Start("updateRound")
+		net.Broadcast()
 	end
-	net.Start("openLobby")
-	net.Broadcast()
 end
+net.Receive("beginGame", beginRound)
 function bestSpawn()
-	local best_spawn = Vector(0,0,0)
-	local closestdis = 0
-	if table.Count(ents.FindByClass("npc_zombie")) == 0 then
-		return positions[math.random(1, table.Count(positions))]
-	end
+	local bestspawn = Vector(0,0,0)
+	local cDis = 0
 	for _, pos in pairs(positions) do
-		local closestZDis = 1000000
+		local zDis = 1000000
 		for _, ent in pairs(ents.FindByClass(zombie)) do
-			if ent:GetPos():Distance(pos) < closestZDis then
-				closestZDis = ent:GetPos():Distance(pos)
+			if ent:GetPos():Distance(pos) < zDis then
+				zDis = ent:GetPos():Distance(pos)
 			end
 		end
-		if closestZDis > closestdis then
-			closestdis = closestZDis
-			best_spawn = pos
-		end
+	end
+	if zDis > cDis then
+		cDis = zDis
+		bestspawn = pos
 	end
 end
-local zombie = "npc_zombie"
-local hp = 50
+hook.Add("DoPlayerDeath", "addingOnward", function(ply, att, infl)
+	roundStatus = 0
+	zombieCount = 0
+	isSpawning = false
+end)
 function endRound()
 	roundStatus = 0
 	zombieCount = 0
@@ -85,13 +129,27 @@ function endRound()
 		ply:Lock()
 		timer.Simple(10, function()
 			ply:UnLock()
-			ply:SetPos(positions[math.random(1, table.Count(positions))])
+			GAMEMODE:PlayerSelectSpawn(ply)
 			ply:Spawn()
 			beginRound()
-			stuffs()
 		end)
 	end
-	clUp()
+	timer.Simple(11, function()
+		roundStatus = 1
+		zombieCount = 6
+		hp = 25
+		zombie = "npc_zombie"
+		roundStatus = 1
+		activeRound = 1
+		hp = 25
+		zombie = "npc_zombie"
+		zombieCount = 6
+		isSpawning = true
+		interval = 5
+		currentRound = 1
+		net.Start("openLobby")
+		net.Broadcast()
+	end)
 end
 function stopPlaying(ply)
 	ply:Lock()
@@ -102,59 +160,26 @@ end
 function returnRound()
 	return activeRound
 end
-function clUp()
-	net.Start("UpdateRoundStatus")
-		net.WriteInt(roundStatus, 4)
-	net.Broadcast()
-end
-local multiplier = 1.00
-local amountKilled = 0
-local currentRound = 1
-local wait = false
 hook.Add("Think", "Waves", function()
 	if roundStatus == 1 and isSpawning == true then
 		wait = false
 		if t < CurTime() then
 			t = CurTime() + interval
 			local ent = ents.Create(zombie)
-			ent:SetPos(bestspawn or positions[math.random(1, table.Count(positions))])
+			ent:SetPos(positions[math.random(1, table.Count(positions))])
 			ent:Spawn()
-			ent:SetHealth(hp * multiplier)
+			if #player.GetAll() <= 0 then
+				return false
+			else
+				ent:SetTarget(player.GetAll()[math.random(1, #player.GetAll())])
+			end
+			ent:SetHealth(hp * activeRound)
 			ent:Activate()
+			ent:SetGravity(1)
+			ent:SetVelocity(Vector(500, 0, 0)) --Do not remove. If you do, the zombies will spawn ontop of each other sadly.
 			zombieCount = zombieCount - 1
 			if not IsValid(ent) then
 				amountKilled = amountKilled + 1
-			end
-			if amountKilled == 25 then
-				for _, ply in pairs(player.GetAll()) do
-					ply:Give("weapon_stunstick")
-				end
-				amountKilled = amountKilled + 1
-			end
-			if activeRound % 5 == 0 then
-				zombie = "npc_zombine"
-				hp = 100
-			elseif activeRound % 7 == 0 then
-				zombie = "npc_fastzombie"
-				hp = 70
-			elseif activeRound % 15 == 0 then
-				zombie = "npc_poisonzombie"
-				hp = 200
-			elseif activeRound % 10 == 0 then
-				roundStatus = 2
-				isSpawning = false
-				local ent = ents.Create("npc_antlionguard")
-				ent:SetPos(bestspawn or positions[math.random(1, table.Count(positions))])
-				ent:Spawn()
-				ent:SetHealth(750)
-				ent:Activate()
-				if not IsValid(ent) then
-					isSpawning = false
-					roundStatus = 1
-				end
-			else
-				zombie = "npc_zombie"
-				hp = 50
 			end
 			if currentRound % 4 == 0 then
 				for _, ply in pairs(player.GetAll()) do
@@ -174,21 +199,49 @@ hook.Add("Think", "Waves", function()
 		timer.Simple(7, function() sound.Play("rounds/round/round_start.mp3", player.GetAll()[1]:GetPos(), 75, 100) end)
 		activeRound = activeRound + 1
 		currentRound = currentRound + 1
-		net.Send("updateRound")
-			net.WriteInt(activeRound, 5)
-		net.Broadcast()
 		multiplier = multiplier + 0.75
 		wait = true
-		PrintMessage(HUD_PRINTTALK, "Round: " .. activeRound .. " has begun!")
 		for _, ply in pairs(player.GetAll()) do
 			ply:SetNWInt("wave", activeRound)
 		end
 		timer.Create("rektkid", 7, 1, function()
-			zombieCount = 5 * activeRound
+			if activeRound % 8 == 0 then
+				zombie = "npc_zombine"
+				hp = 50
+				zombieCount = 6
+			elseif activeRound % 5 == 0 then
+				zombie = "npc_fastzombie"
+				hp = 15
+				zombieCount = 10
+			elseif activeRound % 15 == 0 then
+				zombie = "npc_poisonzombie"
+				hp = 75
+				zombieCount = 6
+			else
+				zombie = "npc_zombie"
+				hp = 25
+				zombieCount = 5 * activeRound
+			end
+			if activeRound >= 5 and activeRound < 10 then
+				interval = 3
+			elseif activeRound >= 10 then
+				interval = 2
+			end
 			isSpawning = true
+			PrintMessage(HUD_PRINTTALK, "Round: " .. activeRound .. " has begun!")
 		end)
 	end
 	if amount == #player.GetAll() then
 		roundStatus = 0
 	end
+end)
+hook.Add("Think", "giveweaponsCL", function()
+	net.Receive("giveWeapon", function(len, ply)
+		local killcounter = ply:GetNWInt("killcounter")
+		local killamount = killcounter
+		if killamount % 39 == 0 then
+			ply:Give("weapon_stunstick")
+			killamount = killamount + 1
+		end
+	end)
 end)
