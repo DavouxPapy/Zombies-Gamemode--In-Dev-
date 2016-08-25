@@ -63,5 +63,9 @@ function openLobby()
 		net.SendToServer()
 		frame:Close()
 	end
+	local ply = LocalPlayer()
+	ply:SetNWBool("ready", true)
+	net.Start("readyUp")
+	net.SendToServer()
 end
 net.Receive("openLobby", openLobby)
