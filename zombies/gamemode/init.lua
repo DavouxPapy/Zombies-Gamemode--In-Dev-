@@ -14,6 +14,7 @@ util.AddNetworkString("class1")
 util.AddNetworkString("class2")
 util.AddNetworkString("class3")
 util.AddNetworkString("class4")
+util.AddNetworkString("readyUp")
 playersReady = 0
 ----
 local class1weaps = {
@@ -22,7 +23,7 @@ local class1weaps = {
 }
 local class2weaps = {
 	"weapon_crowbar",
-	"weapon_smg1"
+	"weapon_smg"
 }
 local class3weaps = {
 	"weapon_ar2",
@@ -49,7 +50,10 @@ function GM:PlayerInitialSpawn(ply)
 	ply:SetRunSpeed(320)
 	ply:SetCrouchedWalkSpeed(0.3)
 	ply:SetHealth(40)
-	ply:SetNWInt("wave", 1)
+	GAMEMODE:PlayerSelectSpawn(ply)
+	ply:SetNWBool("ready", false)
+	ply:SetTeam(1)
+	ply:GodDisable()
 	net.Start("openLobby")
 	net.Send(ply)
 end
@@ -101,7 +105,9 @@ function GM:GetPlayerKills(ply)
 	return ply:GetPData("kills", "0")
 end
 function GM:HUDShouldDraw(element)
-	return (element ~= "CHudDeathNotice")
+	if element == "CHudDeathNotice" then
+		return false
+	end
 end
 function GM:PlayerCanHearPlayersVoice()
 	return true
@@ -120,17 +126,52 @@ hook.Add("OnNPCKilled", "Addkills", KillCounter)
 function GM:DoPlayerDeath(ply, att, infl)
 	ply:SetNWInt("wave", 1)
 	ply:SetNWInt("killcounter", 0)
+	ply:SetNWBool("ready", false)
 	stopPlaying(ply)
 	amountKilled = amountKilled + 1
-	if amountKilled == #player.GetAll() then
+	if amountKilled == #player.GetAll() and #player.GetAll() ~= 0 then
 		endRound()
+		sound.Play("rounds/round/game_over_4.mp3", att:GetPos())
 	end
 	if returnRound() == 1 then
-		PrintMessage(HUD_PRINTCENTER, "GAME OVER! YOU SURVIVED " .. returnRound() .. " ROUND!")
+		ply:PrintMessage(HUD_PRINTCENTER, "GAME OVER! YOU SURVIVED " .. returnRound() .. " ROUND!")
 	elseif returnRound() == 0 then
-		PrintMessage(HUD_PRINTCENTER, "You didnt survive any roundes :(")
+		ply:PrintMessage(HUD_PRINTCENTER, "You didnt survive any roundes :(")
 	else
-		PrintMessage(HUD_PRINTCENTER, "GAME OVER! YOU SURVIVED " .. returnRound() .. " ROUNDS!")
+		ply:PrintMessage(HUD_PRINTCENTER, "GAME OVER! YOU SURVIVED " .. returnRound() .. " ROUNDS!")
 	end
-	sound.Play("rounds/round/game_over_4.mp3", att:GetPos())
+	ply:ChatPrint("You have died! You must wait for the other humans to die now.")
 end
+function GM:PlayerSelectSpawn(pl)
+	local selectSpawns = ents.FindByClass("spawn_human")
+	local random = table.Random(selectSpawns)
+	return random
+end
+hook.Add("PlayerShouldTakeDamage", "lel", function(ply, ent)
+	if ply:Team() == 1 and IsValid(ply) then
+		return true
+	end
+end)
+local amountready = 0
+hook.Add("Think", "stuffs", function()
+	for _, ply in pairs(player.GetAll()) do
+		if ply:GetNWBool("ready") then
+			amountready = amountready + 1
+		end
+	end
+	if amountready == #player.GetAll() then
+		net.Start("loop1")
+		net.Broadcast()
+	end
+end)
+hook.Add("EntityTakeDamage", "moar", function(ent, dmginfo)
+	if ent:IsPlayer() and IsValid(ent) and ent:Team() == 1 then
+		local hp = ent:Health()
+		local dmgtaken = hp - dmginfo:GetDamage()
+		ent:SetHealth(dmgtaken)
+		if ent:Health() <= 0 then
+			ent:Kill()
+		end
+		return true
+	end
+end)
